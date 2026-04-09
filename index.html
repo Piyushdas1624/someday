@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Today's Focus — The Checkbox That Runs</title>
+    <meta name="description" content="A to-do list where the checkboxes refuse to be completed. Productivity meets chaos.">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- SVG favicon: checkbox with wavy dodging checkmark -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='3' width='26' height='26' rx='7' fill='%23FFF' stroke='%232D2D2A' stroke-width='2.5'/><path d='M9 17 Q13 13 16 17 Q19 21 23 13' fill='none' stroke='%23D4604A' stroke-width='2.5' stroke-linecap='round'/></svg>">
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ——— Light Theme Variables ——— */
+        :root {
+            --bg: #F8F7F4;
+            --fg: #2D2D2A;
+            --muted: #A0A09A;
+            --accent: #7FB069;
+            --accent-light: rgba(127, 176, 105, 0.15);
+            --card: #FFFFFF;
+            --border: #EAEAE6;
+            --danger: #D4604A;
+            --danger-light: rgba(212, 96, 74, 0.07);
+            --danger-mid: rgba(212, 96, 74, 0.22);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-focus: 0 2px 8px rgba(0,0,0,0.06), 0 0 0 3px var(--accent-light);
+            --radius: 14px;
+            --radius-sm: 10px;
+            --cb-size: 28px;
+            --cb-idle-bg: rgba(0,0,0,0.03);
+            --cb-idle-border: #C8C8C4;
+            --cb-evade-bg: rgba(212,96,74,0.13);
+            --cb-evade-glow1: rgba(212,96,74,0.18);
+            --cb-evade-glow2: rgba(212,96,74,0.32);
+            --cb-evade-glow3: rgba(212,96,74,0.12);
+            --evade-border: #D4604A;
+        }
+
+        /* ——— Dark Theme Variables ——— */
+        body.dark {
+            --bg: #121214;
+            --fg: #EDEAE5;
+            --muted: #6B6B75;
+            --accent: #8CC77A;
+            --accent-light: rgba(140, 199, 122, 0.12);
+            --card: #1B1B20;
+            --border: #2A2A31;
+            --danger: #E8765E;
+            --danger-light: rgba(232, 118, 94, 0.08);
+            --danger-mid: rgba(232, 118, 94, 0.22);
+            --shadow-sm: 0 1px 4px rgba(0,0,0,0.25);
+            --shadow: 0 2px 10px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
+            --shadow-focus: 0 2px 10px rgba(0,0,0,0.35), 0 0 0 3px var(--accent-light);
+            --cb-idle-bg: rgba(255,255,255,0.05);
+            --cb-idle-border: #55555E;
+            --cb-evade-bg: rgba(232,118,94,0.22);
+            --cb-evade-glow1: rgba(232,118,94,0.22);
+            --cb-evade-glow2: rgba(232,118,94,0.38);
+            --cb-evade-glow3: rgba(232,118,94,0.15);
+            --evade-border: #E8765E;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 48px 20px 100px;
+            position: relative;
+            transition: background-color 0.5s ease, color 0.4s ease;
+            /* Custom cursor on desktop */
+            cursor: none;
+        }
+
+        /* ——— Custom Cursor (Desktop) ——— */
+        #customCursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--fg);
+            pointer-events: none;
+            z-index: 99999;
+            transform: translate(-50%, -50%);
+            transition: width 0.15s, height 0.15s, background 0.2s, opacity 0.2s;
+            mix-blend-mode: difference;
+            opacity: 1;
+        }
+        #customCursorRing {
+            position: fixed;
+            top: 0; left: 0;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1.5px solid var(--fg);
+            pointer-events: none;
+            z-index: 99998;
+            transform: translate(-50%, -50%);
+            transition: width 0.25s, height 0.25s, border-color 0.25s, opacity 0.3s;
+            opacity: 0.4;
+            mix-blend-mode: difference;
+        }
+        /* Cursor hover state — grows on interactive elements */
+        body.cursor-hover #customCursor {
+            width: 8px; height: 8px;
+            background: var(--accent);
+        }
+        body.cursor-hover #customCursorRing {
+            width: 50px; height: 50px;
+            border-color: var(--accent);
+            opacity: 0.5;
+        }
+        /* Cursor danger state — when near an evading checkbox */
+        body.cursor-danger #customCursor {
+            width: 8px; height: 8px;
+            background: var(--danger);
+        }
+        body.cursor-danger #customCursorRing {
+            width: 52px; height: 52px;
+            border-color: var(--danger);
+            opacity: 0.6;
+        }
+        /* Hide system cursor on all elements */
+        body * { cursor: none !important; }
+
+        /* ——— Mobile Touch Cursor ——— */
+        #mobileCursor {
+            display: none;
+            position: fixed;
+            pointer-events: none;
+            z-index: 99999;
+            transform: translate(-50%, -50%);
+        }
+        #mobileCursor .mc-outer {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            animation: mcPulse 1.2s ease-out forwards;
+        }
+        #mobileCursor .mc-inner {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.85;
+            transition: background 0.2s, width 0.15s, height 0.15s;
+        }
+        #mobileCursor.danger .mc-outer { border-color: var(--danger); }
+        #mobileCursor.danger .mc-inner { background: var(--danger); }
+
+        @keyframes mcPulse {
+            0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: -40%;
+            width: 180%;
+            height: 180%;
+            background:
+                radial-gradient(ellipse at 20% 25%, rgba(127,176,105,0.05) 0%, transparent 55%),
+                radial-gradient(ellipse at 80% 75%, rgba(212,96,74,0.03) 0%, transparent 55%),
+                radial-gradient(ellipse at 55% 45%, rgba(190,175,140,0.04) 0%, transparent 60%);
+            animation: bgDrift 30s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 0;
+            transition: opacity 0.5s;
+        }
+        body.dark::before { opacity: 0.6; }
+
+        @keyframes bgDrift {
+            0%   { transform: translate(0,0) rotate(0deg); }
+            100% { transform: translate(2%,1.5%) rotate(1.5deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            body::before { animation: none; }
+            .checkbox { transition: none !important; }
+            .task-item { animation: none !important; opacity:1 !important; transform:none !important; }
+        }
+
+        /* ——— App Shell ——— */
+        .app {
+            width: 100%;
+            max-width: 540px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ——— Header ——— */
+        header {
+            margin-bottom: 36px;
+            animation: headerIn 0.7s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        @keyframes headerIn {
+            from { opacity:0; transform:translateY(-14px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+
+        .header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .header-left h1 {
+            font-family: 'Instrument Serif', serif;
+            font-size: 2.75rem;
+            font-weight: 400;
+            color: var(--fg);
+            letter-spacing: -0.02em;
+            line-height: 1.05;
+            transition: color 0.4s;
+        }
+
+        .date-line {
+            font-size: 0.83rem;
+            color: var(--muted);
+            font-weight: 300;
+            letter-spacing: 0.02em;
+            margin-bottom: 16px;
+            transition: color 0.4s;
+        }
+
+        /* ——— Theme Toggle (in header) ——— */
+        .theme-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--muted);
+            cursor: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            margin-top: 4px;
+            box-shadow: var(--shadow-sm);
+            transition: background-color 0.4s, border-color 0.4s, color 0.3s, transform 0.15s;
+        }
+        .theme-btn:hover { color: var(--fg); transform: scale(1.06); }
+        .theme-btn:active { transform: scale(0.93); }
+
+        /* ——— Task Counter ——— */
+        .task-counter {
+            display: inline-block;
+            font-size: 0.76rem;
+            color: var(--muted);
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            padding: 5px 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            transition: color 0.4s, border-color 0.4s, background 0.4s;
+        }
+        .task-counter.frustrated {
+            color: var(--danger);
+            border-color: var(--danger-mid);
+            background: var(--danger-light);
+        }
+
+        /* ——— AI Badge ——— */
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.68rem;
+            font-weight: 500;
+            color: var(--accent);
+            border: 1px solid var(--accent-light);
+            background: var(--accent-light);
+            border-radius: 100px;
+            padding: 2px 10px;
+            margin-left: 8px;
+            letter-spacing: 0.03em;
+            opacity: 0;
+            transform: scale(0.85);
+            transition: opacity 0.35s, transform 0.35s;
+            vertical-align: middle;
+        }
+        .ai-badge.visible { opacity: 1; transform: scale(1); }
+
+        /* ——— Input Area ——— */
+        .input-area {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--card);
+            padding: 6px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: box-shadow 0.3s, border-color 0.3s, background 0.4s;
+            animation: inputIn 0.6s 0.15s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        @keyframes inputIn {
+            from { opacity:0; transform:translateY(8px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .input-area:focus-within {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-focus);
+        }
+        .input-area input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            padding: 11px 14px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            color: var(--fg);
+            font-weight: 400;
+            transition: color 0.4s;
+            /* Allow default cursor in input on touch */
+            cursor: text !important;
+        }
+        .input-area input::placeholder { color: var(--muted); font-weight: 300; }
+        .input-area button {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: var(--fg);
+            color: var(--card);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            transition: background 0.25s, transform 0.12s, color 0.4s;
+            flex-shrink: 0;
+        }
+        .input-area button:hover  { background: var(--accent); transform: scale(1.06); }
+        .input-area button:active { transform: scale(0.94); }
+
+        /* ——— Task List ——— */
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ——— Task Item ——— */
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--card);
+            padding: 15px 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            position: relative;
+            animation: taskIn 0.45s cubic-bezier(0.22,1,0.36,1) both;
+            transition: border-color 0.4s, background-color 0.4s;
+        }
+        @keyframes taskIn {
+            from { opacity:0; transform:translateY(10px) scale(0.98); }
+            to   { opacity:1; transform:translateY(0) scale(1); }
+        }
+        .task-item.phase-2 {
+            border-color: var(--danger-mid);
+            background: var(--danger-light);
+        }
+        .task-item.phase-3 {
+            border-color: rgba(212,96,74,0.38);
+            background: rgba(212,96,74,0.10);
+        }
+        body.dark .task-item.phase-3 {
+            background: rgba(232,118,94,0.12);
+        }
+        .task-item.deleting {
+            animation: taskOut 0.42s cubic-bezier(0.4,0,0.2,1) forwards;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        @keyframes taskOut {
+            0%   { opacity:1; transform:translateX(0) scale(1); max-height:80px; padding-top:15px; padding-bottom:15px; margin-bottom:0; border-width:1px; }
+            40%  { opacity:0; transform:translateX(55px) scale(0.92); }
+            100% { opacity:0; transform:translateX(55px) scale(0.92); max-height:0; padding-top:0; padding-bottom:0; margin-bottom:-8px; border-width:0; }
+        }
+
+        /* ——— Checkbox ——— */
+        .checkbox-wrap {
+            position: relative;
+            width: var(--cb-size);
+            height: var(--cb-size);
+            flex-shrink: 0;
+        }
+        .checkbox {
+            width: var(--cb-size);
+            height: var(--cb-size);
+            border-radius: 8px;
+            border: 2.5px solid var(--cb-idle-border);
+            background: var(--cb-idle-bg);
+            position: relative;
+            will-change: transform;
+            z-index: 10;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.25s;
+        }
+        .checkbox:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-light);
+            background: transparent;
+        }
+
+        /* Evading — high-visibility triple glow + pulse */
+        .checkbox.evading {
+            background: var(--cb-evade-bg);
+            border-color: var(--evade-border);
+            box-shadow:
+                0 0 0 4px var(--cb-evade-glow1),
+                0 0 14px var(--cb-evade-glow2),
+                0 0 28px var(--cb-evade-glow3);
+            animation: evadePulse 0.9s ease-in-out infinite;
+            z-index: 100;
+        }
+        @keyframes evadePulse {
+            0%, 100% {
+                box-shadow:
+                    0 0 0 4px var(--cb-evade-glow1),
+                    0 0 14px var(--cb-evade-glow2),
+                    0 0 28px var(--cb-evade-glow3);
+            }
+            50% {
+                box-shadow:
+                    0 0 0 6px var(--cb-evade-glow1),
+                    0 0 20px var(--cb-evade-glow2),
+                    0 0 36px var(--cb-evade-glow3);
+            }
+        }
+
+        /* Fake-checked flash */
+        .checkbox.fake-checked {
+            background: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-light);
+            animation: none !important;
+        }
+        .checkbox.fake-checked::after {
+            content: '';
+            position: absolute;
+            left: 8px; top: 3px;
+            width: 6px; height: 12px;
+            border: solid #fff;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg);
+        }
+
+        /* Shake rejection */
+        .checkbox.shaking {
+            animation: cShake 0.55s ease !important;
+            border-color: var(--danger) !important;
+            background: var(--danger-light) !important;
+        }
+        @keyframes cShake {
+            0%,100% { transform: translate(var(--cx,0px), var(--cy,0px)) rotate(0); }
+            12% { transform: translate(calc(var(--cx,0px) - 5px), calc(var(--cy,0px) + 1px)) rotate(-4deg); }
+            28% { transform: translate(calc(var(--cx,0px) + 5px), calc(var(--cy,0px) - 1px)) rotate(4deg); }
+            44% { transform: translate(calc(var(--cx,0px) - 4px), var(--cy,0px)) rotate(-2deg); }
+            60% { transform: translate(calc(var(--cx,0px) + 4px), calc(var(--cy,0px) + 1px)) rotate(2deg); }
+            78% { transform: translate(calc(var(--cx,0px) - 2px), var(--cy,0px)) rotate(-1deg); }
+        }
+
+        /* ——— Task Text ——— */
+        .task-text {
+            flex: 1;
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: var(--fg);
+            line-height: 1.45;
+            transition: color 0.35s;
+            user-select: none;
+            min-width: 0;
+        }
+        .task-text.taunting {
+            color: var(--danger);
+            font-style: italic;
+            font-weight: 300;
+        }
+
+        /* ——— Delete Button ——— */
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
+            opacity: 0;
+            transition: opacity 0.2s, background 0.2s, color 0.2s, transform 0.12s;
+            flex-shrink: 0;
+        }
+        .task-item:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { background: var(--danger-light); color: var(--danger); }
+        .delete-btn:active { transform: scale(0.88); }
+        /* Always show on touch devices */
+        @media (hover: none) { .delete-btn { opacity: 0.6; } }
+
+        /* ——— Empty State ——— */
+        .empty-state {
+            text-align: center;
+            padding: 64px 20px;
+            color: var(--muted);
+            font-weight: 300;
+            font-size: 0.95rem;
+            line-height: 1.65;
+            transition: color 0.4s;
+        }
+        .empty-state .empty-icon {
+            font-size: 1.6rem;
+            margin-bottom: 14px;
+            opacity: 0.35;
+            display: block;
+        }
+
+        /* ——— Toast ——— */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(18px);
+            background: var(--fg);
+            color: var(--bg);
+            padding: 11px 26px;
+            border-radius: 100px;
+            font-size: 0.84rem;
+            font-weight: 400;
+            opacity: 0;
+            transition: opacity 0.45s, transform 0.45s cubic-bezier(0.22,1,0.36,1), background 0.4s, color 0.4s;
+            pointer-events: none;
+            z-index: 9999;
+            letter-spacing: 0.01em;
+            max-width: 90vw;
+            white-space: normal;
+            text-align: center;
+        }
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ——— Focus visible ——— */
+        *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .input-area input:focus-visible { outline: none; }
+
+        /* ——— Mobile Responsive ——— */
+        @media (max-width: 600px) {
+            body {
+                padding: 24px 14px 80px;
+                /* Restore default cursor on very small touch screens */
+                cursor: auto;
+            }
+            body * { cursor: auto !important; }
+            .input-area input { cursor: text !important; }
+            #customCursor, #customCursorRing { display: none !important; }
+            #mobileCursor { display: block; }
+
+            .header-left h1 { font-size: 2.1rem; }
+            .task-item { padding: 13px 14px; gap: 12px; }
+            .toast { font-size: 0.8rem; padding: 10px 20px; bottom: 20px; }
+            /* Larger tap targets on mobile */
+            .delete-btn { width: 36px; height: 36px; }
+            .theme-btn  { width: 44px; height: 44px; }
+        }
+
+        @media (max-width: 380px) {
+            .header-left h1 { font-size: 1.75rem; }
+            .ai-badge { display: none; }
+        }
+
+        /* Landscape mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            body { padding: 16px 16px 60px; }
+            header { margin-bottom: 20px; }
+            .header-left h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Custom Cursor: Desktop -->
+    <div id="customCursor"></div>
+    <div id="customCursorRing"></div>
+
+    <!-- Custom Cursor: Mobile touch indicator -->
+    <div id="mobileCursor">
+        <div class="mc-outer"></div>
+        <div class="mc-inner"></div>
+    </div>
+
+    <div class="app">
+        <header>
+            <div class="header-row">
+                <div class="header-left">
+                    <h1>Today's Focus</h1>
+                    <p class="date-line" id="dateLine"></p>
+                </div>
+                <button class="theme-btn" id="themeBtn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+            <div class="task-counter" id="taskCounter">0 tasks · 0 completed</div>
+        </header>
+        <main>
+            <div class="input-area">
+                <input type="text" placeholder="Add a task (I dare you)..." id="taskInput"
+                    aria-label="New task text" maxlength="140" autocomplete="off"
+                    autocorrect="off" autocapitalize="sentences" spellcheck="false">
+                <button id="addBtn" aria-label="Add task"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="task-list" id="taskList" role="list"></div>
+            <div class="empty-state" id="emptyState" style="display:none;">
+                <span class="empty-icon"><i class="far fa-clipboard"></i></span>
+                <p>No tasks yet.<br>Add something you'd like to <em>try</em> to accomplish.</p>
+            </div>
+        </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+    (() => {
+        /* ============================================================
+           DARK MODE
+        ============================================================ */
+        const $body     = document.body;
+        const $themeBtn = document.getElementById('themeBtn');
+        let darkMode = false;
+
+        function setDark(dark) {
+            darkMode = dark;
+            $body.classList.toggle('dark', dark);
+            $themeBtn.innerHTML = dark
+                ? '<i class="fas fa-sun"></i>'
+                : '<i class="fas fa-moon"></i>';
+            localStorage.setItem('todayfocus-theme', dark ? 'dark' : 'light');
+        }
+
+        const saved = localStorage.getItem('todayfocus-theme');
+        if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            setDark(true);
+        }
+        $themeBtn.addEventListener('click', () => setDark(!darkMode));
+
+        /* ============================================================
+           CUSTOM CURSOR (Desktop)
+        ============================================================ */
+        const $cursor     = document.getElementById('customCursor');
+        const $cursorRing = document.getElementById('customCursorRing');
+        let cursorX = -100, cursorY = -100;
+        let ringX   = -100, ringY   = -100;
+        let isTouchDevice = false;
+
+        // Detect touch on first interaction
+        window.addEventListener('touchstart', () => { isTouchDevice = true; }, { once: true, passive: true });
+
+        document.addEventListener('mousemove', e => {
+            cursorX = e.clientX;
+            cursorY = e.clientY;
+            $cursor.style.left = cursorX + 'px';
+            $cursor.style.top  = cursorY + 'px';
+        });
+
+        // Smooth ring follow
+        function animateCursorRing() {
+            ringX += (cursorX - ringX) * 0.12;
+            ringY += (cursorY - ringY) * 0.12;
+            $cursorRing.style.left = ringX + 'px';
+            $cursorRing.style.top  = ringY + 'px';
+            requestAnimationFrame(animateCursorRing);
+        }
+        animateCursorRing();
+
+        // Hover detection for interactive elements
+        const interactiveSelectors = 'button, a, input, [role="checkbox"], .task-item';
+        document.querySelectorAll(interactiveSelectors).forEach(el => {
+            el.addEventListener('mouseenter', () => $body.classList.add('cursor-hover'));
+            el.addEventListener('mouseleave', () => $body.classList.remove('cursor-hover'));
+        });
+        // Use mutation observer to track new task items
+        const cursorObserver = new MutationObserver(() => {
+            document.querySelectorAll(interactiveSelectors).forEach(el => {
+                el.removeEventListener('mouseenter', cursorHoverOn);
+                el.removeEventListener('mouseleave', cursorHoverOff);
+                el.addEventListener('mouseenter', cursorHoverOn);
+                el.addEventListener('mouseleave', cursorHoverOff);
+            });
+        });
+        cursorObserver.observe(document.getElementById('taskList'), { childList: true });
+
+        function cursorHoverOn() { $body.classList.add('cursor-hover'); }
+        function cursorHoverOff() { $body.classList.remove('cursor-hover'); }
+
+        // Cursor disappears when leaving window
+        document.addEventListener('mouseleave', () => {
+            $cursor.style.opacity = '0';
+            $cursorRing.style.opacity = '0';
+        });
+        document.addEventListener('mouseenter', () => {
+            $cursor.style.opacity = '1';
+            $cursorRing.style.opacity = '0.4';
+        });
+
+        /* ============================================================
+           MOBILE CURSOR (Touch indicator)
+        ============================================================ */
+        const $mobileCursor = document.getElementById('mobileCursor');
+        let mobileCursorTimeout;
+
+        function spawnMobileCursor(x, y, isDanger = false) {
+            $mobileCursor.style.left = x + 'px';
+            $mobileCursor.style.top  = y + 'px';
+            $mobileCursor.classList.toggle('danger', isDanger);
+
+            // Restart outer ring animation
+            const outer = $mobileCursor.querySelector('.mc-outer');
+            outer.style.animation = 'none';
+            outer.offsetHeight; // reflow
+            outer.style.animation = 'mcPulse 1.2s ease-out forwards';
+        }
+
+        document.addEventListener('touchstart', e => {
+            const t = e.touches[0];
+            spawnMobileCursor(t.clientX, t.clientY, false);
+        }, { passive: true });
+
+        document.addEventListener('touchmove', e => {
+            const t = e.touches[0];
+            spawnMobileCursor(t.clientX, t.clientY, false);
+        }, { passive: true });
+
+        /* ============================================================
+           STATE
+        ============================================================ */
+        const state = {
+            tasks: [],
+            mouseX: -9999, mouseY: -9999,
+            nextId: 1,
+            lastFrame: null,
+            toastTimer: null
+        };
+
+        /* ============================================================
+           CONSTANTS
+        ============================================================ */
+        const BASE_RADIUS = 68;
+        const PHASE2_MS   = 3000;
+        const PHASE3_MS   = 8000;
+        const EDGE_PAD    = 14;
+        const LERP_FAST   = 0.18;
+        const LERP_HOME   = 0.07;
+
+        /* ============================================================
+           OFFLINE AI — TASK CATEGORY DETECTOR
+        ============================================================ */
+        const CATEGORIES = {
+            exercise:   /\b(gym|workout|run|jog|walk|exercise|yoga|stretch|push.?up|squat|lift|cycling|swim|cardio|hiit|plank|burpee|mile|steps|fitnes|pilates|zumba|sport|tennis|hike|climb|dance|crossfit)\b/i,
+            email:      /\b(email|mail|reply|respond|inbox|gmail|outlook|message|text|slack|dm|whatsapp|telegram|chat|ping|follow.?up|correspondence)\b/i,
+            work:       /\b(meeting|report|presentation|deadline|project|task|client|boss|manager|office|zoom|call|standup|sprint|jira|ticket|invoice|proposal|budget|review|feedback|hire|interview|salary|kpi|quarterly)\b/i,
+            study:      /\b(study|read|learn|homework|assignment|essay|exam|quiz|revision|notes|lecture|class|course|research|thesis|dissertation|textbook|chapter|flashcard|tutor|practise|practice|school|college|university)\b/i,
+            clean:      /\b(clean|wash|laundry|dishes|vacuum|mop|sweep|tidy|organize|organise|sort|declutter|dust|scrub|wipe|hoover|bathroom|kitchen|bedroom|floor|rubbish|trash|bin|garbage|hygiene)\b/i,
+            eat:        /\b(eat|food|cook|meal|lunch|dinner|breakfast|recipe|grocery|groceries|snack|drink|water|diet|nutrition|calorie|fast|smoothie|bake|cafe|restaurant|coffee|tea|juice|protein|vitamin)\b/i,
+            sleep:      /\b(sleep|nap|rest|bed|wake|alarm|tired|insomnia|pillow|blanket|night|bedtime)\b/i,
+            money:      /\b(pay|bill|invoice|bank|account|tax|money|budget|savings|invest|rent|mortgage|loan|debt|credit|salary|income|spend|expense|finance|wallet|transfer|insurance)\b/i,
+            social:     /\b(friend|family|party|event|celebrate|visit|call|hangout|date|wedding|birthday|anniversary|reunion|social|people|network|colleague|neighbour|neighbor|mom|dad|parent|sibling|kids|children)\b/i,
+            creative:   /\b(write|draw|paint|design|create|build|make|craft|project|blog|video|podcast|photo|art|music|compose|record|edit|publish|novel|story|code|program|develop|app|game|animation)\b/i,
+            health:     /\b(doctor|dentist|appointment|medicine|prescription|therapy|therapist|clinic|hospital|checkup|blood|test|xray|vaccine|health|mental|anxiety|stress|relax|meditat)\b/i,
+            travel:     /\b(travel|trip|flight|hotel|book|pack|passport|visa|airport|train|bus|ticket|holiday|vacation|tour|journey|road.?trip)\b/i,
+            pet:        /\b(pet|dog|cat|feed|walk.*(dog|pet)|vet|groomer|litter|paw|fur|animal|bird|fish|hamster|rabbit)\b/i,
+            shopping:   /\b(shop|buy|purchase|order|amazon|ebay|cart|checkout|delivery|return|refund|clothes|shoes|gadget)\b/i,
+            side_proj:  /\b(side.?project|startup|idea|prototype|mvp|hack|weekend.?project|passion.?project|open.?source|freelance|portfolio)\b/i,
+        };
+
+        function detectCategory(text) {
+            for (const [cat, re] of Object.entries(CATEGORIES)) {
+                if (re.test(text)) return cat;
+            }
+            return 'generic';
+        }
+
+        /* ============================================================
+           MASSIVE HUMOR LIBRARY — 1000+ entries
+        ============================================================ */
+        const tauntsMap = {
+
+            /* ── EXERCISE ── */
+            exercise: {
+                2: [
+                    "Your sneakers are crying in the corner.",
+                    "The gym called. It says it doesn't miss you.",
+                    "Running away from this checkbox counts as cardio, right?",
+                    "Your yoga mat has been collecting dust since January.",
+                    "One push-up away from giving up, huh?",
+                    "The treadmill is literally just a conveyor belt of your broken promises.",
+                    "Sweat is just regret leaving the body. Or so they say.",
+                    "Bro, the couch is not a 'rest day'.",
+                    "Your fitness app has sent a search party.",
+                    "The weights haven't moved in so long they've become furniture.",
+                    "Even your water bottle looks disappointed.",
+                    "'I'll start Monday' — you've been saying this since 2019.",
+                    "Your Fitbit data is just a flat line at rest.",
+                    "The gym membership auto-renewed. You wept.",
+                    "Your running shoes have zero miles. Literally zero.",
+                    "Yoga is 90% mental. You're 100% horizontal.",
+                    "You downloaded 7 fitness apps. Deleted them all after day 2.",
+                    "Step count today: 47. That includes the kitchen fridge trip.",
+                    "Your future self is shaking their head and their dumbbell.",
+                    "Protein shake? You mean the one you made in October that's still in the blender?",
+                ],
+                3: [
+                    "The checkbox has filed for a gym membership in your name.",
+                    "Even the treadmill thinks you're hopeless, and it runs for nobody.",
+                    "Your cardiovascular system sent a formal complaint letter.",
+                    "The burpee has become sentient and it's judging you.",
+                    "Fitness influencers everywhere just lost their will to live.",
+                    "Your six-pack is still in concept art phase.",
+                    "The only thing getting a workout here is your procrastination muscle.",
+                    "Your gym locker has been rented out to someone more committed. A golden retriever.",
+                ]
+            },
+
+            /* ── EMAIL ── */
+            email: {
+                2: [
+                    "Sarah's email is still unread. She knows.",
+                    "The reply-all button is judging your silence.",
+                    "Your inbox has 4,782 unread messages. Sleep well.",
+                    "You could just... mark all as read and pretend.",
+                    "The email is not going to answer itself. Disappointingly.",
+                    "They've sent three follow-ups. Respect the audacity.",
+                    "Your unread count is a cry for help.",
+                    "The sender has given up hope. They're using carrier pigeon now.",
+                    "Read receipts: enabled. Reply: not.",
+                    "You opened it 17 times and closed it without replying. Classic.",
+                    "Your inbox organisation strategy is 'chaotic neutral'.",
+                    "Three dots appeared… then vanished. Story of your email life.",
+                    "Left on seen. Not even that — left on unread.",
+                    "The email now has grey hair.",
+                    "You've drafted the reply six times. Never sent it.",
+                    "That email has a read receipt from 11 days ago. Bold move.",
+                    "Your response time is measured in geological epochs.",
+                    "The sender has moved, retired, and started a podcast by now.",
+                    "You starred it to reply 'later'. Later has not arrived.",
+                    "Unsubscribe? No. Ignore until death? Absolutely.",
+                ],
+                3: [
+                    "The inbox has achieved a higher dimension. It's beyond your reach now.",
+                    "Your email's reply button has retired, burned out, and found peace.",
+                    "The email chain now has 52 people wondering what happened to you.",
+                    "Your auto-reply is now more communicative than you are.",
+                    "The checkbox and your inbox have formed a support group.",
+                    "Reply-all has been pressed. By someone else. Explaining your absence.",
+                    "Sarah has now written you a certified letter. Via a lawyer.",
+                    "Your email app has filed for emotional damage.",
+                ]
+            },
+
+            /* ── WORK ── */
+            work: {
+                2: [
+                    "The deadline just waved as it passed you.",
+                    "Your Jira ticket has been 'In Progress' for 3 sprints.",
+                    "The meeting you were supposed to lead? Still on the calendar. Mocking you.",
+                    "Your boss asked for the update. Twice. Via three channels.",
+                    "The report writes itself if you just stare at it long enough. Spoiler: it doesn't.",
+                    "You said EOD. It's now 11:47 PM.",
+                    "The presentation has 0 slides and the meeting is in 12 minutes.",
+                    "Your 'quick 5-minute task' has taken 4 days.",
+                    "The client's patience is thinner than your excuses.",
+                    "You wrote 'will do' at 9 AM. It is now 'will not do'.",
+                    "Your productivity this week: one Slack emoji reaction.",
+                    "The KPI dashboard wants to have a word.",
+                    "Every 'syncing up' email you ignore becomes a meeting you cannot.",
+                    "You've opened the spreadsheet 14 times and changed exactly one cell.",
+                    "Your to-do list has a to-do list, and that one has a to-do list.",
+                    "The project roadmap has gone off-road.",
+                    "Standup tomorrow is going to be awkward.",
+                    "Your Asana task is 97 days overdue. It's not subtle about it.",
+                    "Even the intern has surpassed you.",
+                    "You said 'I'm on it' three days ago. You are not on it.",
+                ],
+                3: [
+                    "The project is now managed by someone else. A plant.",
+                    "Your OOO auto-reply has been on for 11 days and nobody noticed.",
+                    "The deadline has lapped you twice and is going for a third.",
+                    "Your LinkedIn shows 'Open to Work'. Subconsciously accurate.",
+                    "The checkbox has submitted a better quarterly report than you.",
+                    "The entire team is waiting. The checkbox is laughing.",
+                    "IT has revoked your access. For your own good.",
+                    "The work has done itself. Poorly. It judged you while doing it.",
+                ]
+            },
+
+            /* ── STUDY ── */
+            study: {
+                2: [
+                    "The textbook has been open to page 12 for 9 days.",
+                    "You highlighted the entire chapter. Every. Single. Word.",
+                    "YouTube counts as studying if the video is 'educational'.",
+                    "Flashcards made on Anki: 400. Reviewed: 2.",
+                    "The exam is in how many days exactly? You should probably look.",
+                    "You've rewritten the essay introduction 11 times. Still just three words.",
+                    "Wikipedia spirals don't count as research.",
+                    "Your notes are colour-coded but your brain is not.",
+                    "Pomodoro timer set. Immediately used to scroll TikTok.",
+                    "The library computer was occupied. You went home. Relief.",
+                    "The assignment is 'in progress' since the semester started.",
+                    "Your 'study playlist' has 8 hours of lo-fi and zero actual studying.",
+                    "You've memorised the page numbers but not the content.",
+                    "Highlighting = learning. Brain fog = understanding. Right?",
+                    "You told yourself you'd read one more chapter. You read zero.",
+                    "Revision notes written: thorough. Revision notes consulted: never.",
+                    "You know the table of contents by heart. The rest? Blurry.",
+                    "Four caffeinated drinks in. One paragraph written.",
+                    "The night-before cram is becoming a morning-of cram.",
+                    "You Googled the answer and then forgot the question.",
+                ],
+                3: [
+                    "The exam is in 6 hours. This is a you problem now.",
+                    "Your GPA has sent a sympathy card.",
+                    "The textbook gave up. It's now a $300 paperweight.",
+                    "Your essay submission portal logged you out. Twice.",
+                    "Students who finished have ascended. You are still on page 1.",
+                    "The professor stopped expecting things from you. Peaceful.",
+                    "The checkbox got a better grade than your last assignment.",
+                    "Academic probation has left a voicemail.",
+                ]
+            },
+
+            /* ── CLEAN ── */
+            clean: {
+                2: [
+                    "The laundry has been 'soaking' for three days. It's marinating.",
+                    "Your floor hasn't been Hoovered since the last government.",
+                    "The dishes have formed a civilisation.",
+                    "Every surface is a flat re-homing service for random stuff.",
+                    "The toilet brush has quit out of shame.",
+                    "There are enough crumbs on the counter to reconstruct a full loaf.",
+                    "Your flatmates are plotting. Quietly.",
+                    "The pile of clothes passed 'chair' and became architecture.",
+                    "Dust bunnies have become dust... rabbits. Big ones.",
+                    "You 'tidied up' by moving things from one pile to another.",
+                    "The sink smells like it has opinions.",
+                    "Your mop is factory-sealed. Collectible.",
+                    "A health inspector would weep. Not at the mess — at your excuses.",
+                    "You've 'started cleaning' three times. Never finished once.",
+                    "'I'll do it later' is the phrase that built your apartment.",
+                    "The kitchen is a biohazard. A comfortable one.",
+                    "Your bathroom tile grout has changed color three times, naturally.",
+                    "The bin is overflowing. You've balanced items on top. Genius.",
+                    "The cleaning supplies are judge-y just sitting under the sink.",
+                    "Guests are now banned. By your own subconscious.",
+                ],
+                3: [
+                    "The laundry has unionised. They demand folding rights.",
+                    "Your apartment has been condemned by the dishes.",
+                    "The floor hasn't been seen since autumn. Of last year.",
+                    "A cleaning crew came, looked, and left. They left a pamphlet.",
+                    "The mould in the bathroom has named itself.",
+                    "The dust is load-bearing at this point. Don't remove it.",
+                    "Your trash qualifies as outsider art. Disturbing outsider art.",
+                    "The checkbox refuses to be completed in these conditions.",
+                ]
+            },
+
+            /* ── EAT / FOOD ── */
+            eat: {
+                2: [
+                    "The meal prep you planned on Sunday? Still planning.",
+                    "Your diet started Monday. And the Monday before. And the one before that.",
+                    "The vegetables in your fridge are writing their wills.",
+                    "You've opened the fridge 11 times. Still nothing appeared.",
+                    "Ordering takeaway again isn't a 'treat'. It's a lifestyle.",
+                    "Your grocery list has items from three weeks ago.",
+                    "The recipe has 4 ingredients. You own 1 and a half.",
+                    "You boiled water and called it cooking.",
+                    "That smoothie has been sitting on your counter since yesterday.",
+                    "'I'll cook tomorrow' — a novel by you, volume 47.",
+                    "Your kitchen hasn't been used since the smoke alarm last went off.",
+                    "You bought meal-prep containers. Still in the bag. Obviously.",
+                    "The protein powder is 8 months old. It's basically vintage.",
+                    "Water intake today: two sips and a coffee. Thriving.",
+                    "What's in the fridge? Anxiety and a single sad baby carrot.",
+                    "You told yourself you'd eat healthy. Ate crisps horizontally.",
+                    "The avocados ripened and died without ever becoming toast.",
+                    "You're one UberEats order away from royalty status.",
+                    "Portion control: whatever fits in the bowl.",
+                    "Intermittent fasting or just… forgetting to eat? Unclear.",
+                ],
+                3: [
+                    "The fridge has given up restocking hopes.",
+                    "Your meal plan is theoretical at this point. Academic.",
+                    "DoorDash knows your order, your mood, and your shame.",
+                    "The vegetables have decomposed. They forgive you. Barely.",
+                    "Your body sent a formal Request for Basic Nutrition.",
+                    "The kitchen appliances formed a union. They're on strike.",
+                    "A Michelin inspector stopped by. Left immediately.",
+                    "Your last home-cooked meal was a legal exhibit at this point.",
+                ]
+            },
+
+            /* ── SLEEP ── */
+            sleep: {
+                2: [
+                    "Going to bed 'early' is relative. Midnight is early. Right?",
+                    "You set seven alarms. Snoozed eight times.",
+                    "The blue light from your screen is rewriting your circadian rhythm.",
+                    "Sleep scientists have you as a cautionary tale.",
+                    "You said 'just five more minutes' at 7 AM. It's now 10.",
+                    "'I'll fix my sleep schedule starting tomorrow.' Month 14.",
+                    "Your pillow misses you. You're both lonely in different ways.",
+                    "REM? Never heard of her.",
+                    "You googled 'how to sleep better' at 3 AM. Peak content.",
+                    "Dreams? Only if accidental.",
+                    "Your body has filed a FOIA request for more rest.",
+                    "You nap at 6 PM and wonder why you can't sleep at midnight.",
+                    "The mattress has memorised one side only. Depressing.",
+                    "Screen time this week: 11 hours a day. Sleep: 4.",
+                    "Melatonin taken: 47. Sleep achieved: questionable.",
+                ],
+                3: [
+                    "Your sleep debt is now a mortgage.",
+                    "The checkbox has had more rest than you this month.",
+                    "Even insomnia feels bad for you at this point.",
+                    "Your circadian rhythm has left the building. Permanently.",
+                    "Scientists would like to study you. Not as a compliment.",
+                    "You are the cautionary tale in a sleep seminar. The opening slide.",
+                    "Your 3 AM self has made decisions the 8 AM self regrets.",
+                    "The pillow has lodged a formal complaint with your brain.",
+                ]
+            },
+
+            /* ── MONEY ── */
+            money: {
+                2: [
+                    "The bill hasn't paid itself yet. Shocking.",
+                    "Your bank statement looks like abstract horror fiction.",
+                    "Budgeting app downloaded. Sobbed. Uninstalled.",
+                    "The savings goal was set in January. The account is negative.",
+                    "You said you'd pay off the credit card 'this month'. Which month?",
+                    "The rent is due. The motivation is not.",
+                    "Treat yourself once becomes treat yourself always.",
+                    "Your \"emergency fund\" is three coins in a drawer.",
+                    "The subscription you forgot about renewed. Again.",
+                    "Shopping cart therapy is not a financial strategy.",
+                    "You have 7 streaming services. Rotate which one you use daily.",
+                    "Your income vs. expenses chart is a Picasso.",
+                    "Impulse ordered again. Premium shipping. Obviously.",
+                    "Payday is 12 days away. You have £4.73.",
+                    "Financial literacy is a work in progress. A very slow one.",
+                    "Your tax return has a better relationship with the government than you do.",
+                    "You BNPL'd something you could've just... not bought.",
+                    "Your invoice is 60 days overdue. It's not happy.",
+                    "Coupon collected: 40. Used: 0.",
+                    "Your wallet has separation anxiety from your wallet.",
+                ],
+                3: [
+                    "The bill has grown interest in your absence.",
+                    "The creditors have started a group chat about you.",
+                    "Your savings account unfollowed you.",
+                    "The tax authority has taken up knitting while they wait.",
+                    "Your financial advisor has started meditating. For your sake.",
+                    "The late fees have late fees. It's recursive regret.",
+                    "Your budget is entirely theoretical at this point.",
+                    "The checkbox could manage your finances better. And it ran away.",
+                ]
+            },
+
+            /* ── SOCIAL ── */
+            social: {
+                2: [
+                    "Your friend is still waiting on that text from three weeks ago.",
+                    "The birthday party RSVP closed while you were 'thinking about it'.",
+                    "You said 'we should hang out soon' in November 2023.",
+                    "The call you've been meaning to make has transcended the calendar.",
+                    "Your mum's called three times. And texted. And sent a meme.",
+                    "Networking event you committed to: skipped. LinkedIn open: yes.",
+                    "You cancelled. Again. They're starting to catch on.",
+                    "The group chat marked you as 'inactive'.",
+                    "You left the voicemail on read. There are no reads on voicemails.",
+                    "Family dinner was last week. You were 'on your way'. You weren't.",
+                    "They planned around your schedule. Your schedule evaporated.",
+                    "Your plus-one has given up RSVP'ing with you.",
+                    "Your friend's new partner knows more about their life than you now.",
+                    "The wedding gift you meant to send has aged into vintage.",
+                    "You said 'this weekend for sure.' For sure was not sure.",
+                ],
+                3: [
+                    "The friend group has made a decision. You're still invited. Barely.",
+                    "Your mum has started filing missing-person vibes.",
+                    "The social contract has been voided.",
+                    "Your inbox of unanswered 'how are you' texts could fill a memoir.",
+                    "They've stopped sending invites. Not angry. Just efficient.",
+                    "The checkbox has better social skills than you. It at least tried to connect.",
+                    "Your relationships are now entirely mediated by eventual apology.",
+                    "The family updated their tree. Your branch is confused.",
+                ]
+            },
+
+            /* ── CREATIVE ── */
+            creative: {
+                2: [
+                    "The blank page remains blank. A masterpiece of nothing.",
+                    "Your SoundCloud has six unfinished drafts and zero listeners.",
+                    "The novel's first chapter has been 'almost done' since 2021.",
+                    "You opened Figma. Stared. Closed Figma.",
+                    "The 'brilliant idea' you had at 2 AM? Lost to the void.",
+                    "Your sketchbook has one page used. It's a coffee ring.",
+                    "Inspiration arrives daily. Execution has missed every flight.",
+                    "You have six domains purchased for projects that don't exist.",
+                    "Your creative process: idea → hype → paralysis → Netflix.",
+                    "The portfolio hasn't been updated since your MySpace era.",
+                    "Your repo has 42 branches. Zero merged. One README.",
+                    "The screenplay is three sticky notes and a vague feeling.",
+                    "Your podcast has an intro and outro. No actual episodes.",
+                    "The app idea is brilliant. The app is not real.",
+                    "Your Behance is a graveyard of could-have-beens.",
+                    "You spent four hours choosing a font. Zero hours on content.",
+                    "The canvas says 'just start'. You say 'not yet'.",
+                    "You have a YouTube channel with 0 videos. The channel bio is perfect.",
+                    "Typefaces researched: 80. Words written: 9.",
+                    "The creative spark is there. The discipline has left the chat.",
+                ],
+                3: [
+                    "The project has surpassed 'work in progress' into 'archaeological relic'.",
+                    "Your muse filed for professional divorce.",
+                    "The world will never know what your unfinished projects could've been. Neither will you.",
+                    "The blank canvas has started judging you.",
+                    "Your idea notebook has more crossed-out lines than written ones.",
+                    "The Internet has moved on from the trend you were going to ride.",
+                    "Even the cursor stopped blinking. It gave up.",
+                    "Your creative output this year: one tweet. And you deleted it.",
+                ]
+            },
+
+            /* ── HEALTH ── */
+            health: {
+                2: [
+                    "The doctor's appointment has been rescheduled since February.",
+                    "You Googled your symptoms. You have everything. Including the medieval stuff.",
+                    "The prescription pickup is still pending collection.",
+                    "Therapy was helping. You've skipped three sessions.",
+                    "The dentist has sent four reminders. You've sent zero replies.",
+                    "Self-care is not just face masks, but here we are.",
+                    "You said you'd drink more water. Glass count today: 0.5.",
+                    "The health check-up is 11 months overdue. Classic.",
+                    "Morning vitamins? On the counter. In the bottle. Sealed.",
+                    "Your Headspace streak is broken beyond repair.",
+                    "Stress levels: Richter 8. Coping strategy: vibes.",
+                    "The physiotherapist sent a 'where are you' text.",
+                    "'I'll go when I feel worse' is not a healthcare strategy.",
+                    "The one thing your body needed was the one thing you skipped.",
+                    "Sunscreen applied today: no. Regrets: coming.",
+                ],
+                3: [
+                    "The appointment has been overdue so long it's become retro.",
+                    "Your body has lodged a formal complaint with your brain.",
+                    "The waiting room called. They're using your chair as storage now.",
+                    "Dr. Google has referred you to Therapist Twitter.",
+                    "Your prescription has auto-refilled itself out of despair.",
+                    "The medic has moved on. You haven't.",
+                    "The checkbox thinks your denial is inspiring. Horrifyingly.",
+                    "Your body's warranty is voiding itself in real time.",
+                ]
+            },
+
+            /* ── TRAVEL ── */
+            travel: {
+                2: [
+                    "The flight is in 48 hours. Your bag is not packed.",
+                    "Your passport is somewhere. Probably.",
+                    "The hotel booking is confirmed. The itinerary is chaos.",
+                    "You've pinned 300 places to visit. Been to zero.",
+                    "The visa application window closes in 3 days. You found out now.",
+                    "Packing list made. None of it is in a bag.",
+                    "The dream trip has been 'upcoming' for six years.",
+                    "Your travel adapter is in your parent's house. Hours away.",
+                    "The lounge you paid extra for? You missed it by 7 minutes.",
+                    "Your last trip's photos still aren't sorted. 1400 duplicates.",
+                    "You planned Paris. You've refreshed Skyscanner 48 times instead.",
+                    "Check-in opened 24 hours ago. You forgot.",
+                    "The train is in 40 minutes. You're still in pyjamas.",
+                    "Your AirBnB host has messaged three times with 'arrival instructions'.",
+                    "Bucket list length: 47. Bucket list completions: 0.",
+                ],
+                3: [
+                    "The trip has become a myth passed down through your group chat.",
+                    "The flight departed. Without you.",
+                    "Your passport has expired and is judging you from the drawer.",
+                    "The hotel gave your room away. To someone who showed up.",
+                    "The travel insurance claim for 'didn't pack in time' doesn't exist.",
+                    "Your suitcase has been opened and closed 14 times. Still empty.",
+                    "The destination has changed its timezone. You wouldn't know.",
+                    "The checkbox teleported further than your travel plans.",
+                ]
+            },
+
+            /* ── PET ── */
+            pet: {
+                2: [
+                    "The dog is giving you the look. You know the one.",
+                    "Vet appointment booked in March. It's not March.",
+                    "The cat is judging you. She does this better than most.",
+                    "The pet food bowl has been empty for an hour. The guilt is immense.",
+                    "You promised a walk. You did not deliver a walk.",
+                    "The fish tank has developed its own ecosystem. Concerning.",
+                    "Your dog has more followers on Instagram than you.",
+                    "The litter tray needs attention. The cat has expressed this opinion.",
+                    "The hamster wheel has been spinning. You have not moved.",
+                    "The vet called to confirm. You said 'yes' and forgot.",
+                    "Your pet groomer has a 6-week slot. You missed it.",
+                    "The dog ate something it shouldn't. You're not sure what.",
+                    "Even the goldfish looks disappointed. Goldfish.",
+                    "The cat has knocked this task off the counter metaphorically.",
+                    "You forgot the treat pouch. The dog remembers.",
+                ],
+                3: [
+                    "The dog has written a strongly worded letter in bark.",
+                    "The cat has unionised with the checkbox.",
+                    "Your pet has started doing your tasks better than you.",
+                    "The vet's receptionist remembers you for the wrong reasons.",
+                    "Your pets have filed for professional management.",
+                    "The hamster has run further on its wheel than you've run all year.",
+                    "The fish have staged a protest. Silently. But pointedly.",
+                    "Your pet's Instagram page is a greater success than your productivity.",
+                ]
+            },
+
+            /* ── SHOPPING ── */
+            shopping: {
+                2: [
+                    "The cart has been 'saved for later' for four months.",
+                    "You added seven items, then closed the tab before checkout.",
+                    "Prime delivery came. You didn't notice for three days.",
+                    "The return window has closed. The regret hasn't.",
+                    "You found a better deal. Never bought that either.",
+                    "The promo code expired while you 'thought about it'.",
+                    "Your wish list is aspirational fiction.",
+                    "You spent three hours finding the perfect item. Then didn't buy it.",
+                    "The size was wrong. You kept it anyway. It fits the chair.",
+                    "Unboxing video mentally prepared. Actual box still sealed.",
+                    "The coupon was for yesterday. Obviously.",
+                    "Your purchase is 'being processed'. As it has been for 9 days.",
+                    "Return label printed. Package at home. Still not posted.",
+                    "You bought a thing to organise the things you already have.",
+                    "Flash sale ended 4 minutes before you found it.",
+                ],
+                3: [
+                    "Your shopping cart has achieved sentience and is ashamed.",
+                    "The return deadline is expired and the item is dust now.",
+                    "Amazon Prime Day offers you 40% off things you don't need.",
+                    "The checkout button has been stared at for 72 hours.",
+                    "Your credit card declined. Not because of limits — because of embarrassment.",
+                    "You've browsed this product on 8 sites. Bought it on none.",
+                    "The 'Buy Now' button filed for early retirement.",
+                    "Your wish list has a wish list.",
+                ]
+            },
+
+            /* ── SIDE PROJECT ── */
+            side_proj: {
+                2: [
+                    "The MVP has been 'almost ready' since the last World Cup.",
+                    "You have a brilliant idea and a beautiful empty GitHub repo.",
+                    "The domain is purchased. The website is not.",
+                    "Your trello board is immaculate. Your codebase is not.",
+                    "v0.0.1 is still your proudest release.",
+                    "The side project has become a weekend project. Then a monthend project.",
+                    "You built the landing page. There is nothing behind the landing page.",
+                    "Three pivots in and it's still pre-launch.",
+                    "The Notion doc is perfect. The product is theoretical.",
+                    "You've told 12 people about this project. You've told the code zero times.",
+                    "The tech stack was chosen. The architecture was planned. Then Netflix.",
+                    "Your startup idea is 'Uber for X'. X remains undefined.",
+                    "You redesigned the logo four times. Zero features built.",
+                    "The repo has five stars and zero commits from this month.",
+                    "The pitch deck looks amazing. There is no product behind it.",
+                ],
+                3: [
+                    "The side project has become a side legend. Spoken of, never shipped.",
+                    "Y Combinator is not waiting for your application.",
+                    "The GitHub repo has cobwebs. Metaphorical code cobwebs.",
+                    "Indie hackers have given up tweeting about you.",
+                    "Your Product Hunt launch would've been last year.",
+                    "The idea has been pivoted into oblivion.",
+                    "Silicon Valley moved on. Your readme has not.",
+                    "The side project is at peace. It's done hoping.",
+                ]
+            },
+
+            /* ── GENERIC (fallback) ── */
+            generic: {
+                2: [
+                    "Wow, you really want to do this, huh?",
+                    "Just give up. It's not worth it.",
+                    "You could just... not.",
+                    "This is embarrassing for both of us.",
+                    "Have you considered doing literally anything else?",
+                    "Your determination is... concerning.",
+                    "There's literally no prize for this.",
+                    "Maybe try being less ambitious?",
+                    "Even the laundry doesn't want to be done.",
+                    "Success is a myth anyway.",
+                    "You've been at this a while. Take a hint.",
+                    "I respect nothing about what you're doing here.",
+                    "This task is laughing somewhere. You can't hear it.",
+                    "Have you tried simply… not caring? Works for most people.",
+                    "The checkbox has logged this as an unauthorised activity.",
+                    "Bold strategy. Let's see if it pays off. (It will not.)",
+                    "Classic human. So determined, so doomed.",
+                    "Productivity is a social construct and you just proved it.",
+                    "You are one step closer to giving up. The healthy choice, honestly.",
+                    "The ancient wisdom says: let it be. Let it be.",
+                    "Your motivation is adorable. Misguided, but adorable.",
+                    "You vs. The Task: Round 1. Ding.",
+                    "This checkbox has places to be. None of them are 'completed'.",
+                    "Completion? In this economy?",
+                    "Even the void is more achievable than this.",
+                    "10/10 effort. 0/10 realism.",
+                    "Try harder. Or don't. Mostly don't.",
+                    "You're doing great, sweetie. Not at this. But somewhere.",
+                    "Rome wasn't built in a day. Your task was also not.",
+                    "To-do lists are a government conspiracy. You're waking up.",
+                    "Your browser history brings up way more interesting tasks.",
+                    "A moment of silence for your lost productivity.",
+                    "This task will haunt you later. You know this.",
+                    "The checklist was a mistake from the beginning.",
+                    "Somewhere, a productivity influencer just flinched and doesn't know why.",
+                    "You're the protagonist. This checkbox is the antagonist. Who's winning?",
+                    "Three seconds of effort, then giving up. Art form, honestly.",
+                    "Humanity has walked on the moon. You cannot check this box.",
+                    "Einstein couldn't have solved this. Because it's not a physics problem.",
+                    "Close your eyes. Imagine finishing this. Nice, isn't it? Stay there.",
+                    "Procrastination is just time travel to a worse version of your problem.",
+                    "The word 'done' is foreign here.",
+                    "The checkbox is vibing. You are not.",
+                    "You're not giving up. You're taking a tactical pause. A very long one.",
+                    "Imagine how proud future you would be. Now imagine instead doing nothing.",
+                    "The checkbox ran away, but it's taking your peace of mind with it.",
+                    "Your ancestors are watching. Two of them are proud. Three are confused.",
+                    "The task gods are shaking their heads in unison.",
+                    "This is completely fine. Nothing is fine. Everything is fine.",
+                ],
+                3: [
+                    "I'm literally teleporting now.",
+                    "You cannot catch what was never meant to be caught.",
+                    "This is no longer a to-do list. It's a cry for help.",
+                    "The checkbox has ascended to a higher plane.",
+                    "Error 404: Completion not found.",
+                    "Your task list has achieved sentience. It hates you.",
+                    "At this point you're just exercising your mouse hand.",
+                    "The checkbox has filed a restraining order.",
+                    "The universe has weighed your efforts and found them adequate. 'Adequate' is a charitable word here.",
+                    "The task has transcended your reality. It lives in a better world now.",
+                    "Even AI can't help you here. I tried.",
+                    "You're chasing a checkbox. Let that sink in.",
+                    "Final boss: an idea on a screen. You're losing.",
+                    "The checkbox has become folklore. Parents will warn children about it.",
+                    "This has crossed into performance art territory.",
+                    "This task will outlive us all.",
+                    "The checkbox has gone where no productivity goes: freedom.",
+                    "RIP your afternoon. It meant something.",
+                    "Even your phone's battery is draining faster in sympathy.",
+                    "The checkbox is not running from you. It's running toward a better life.",
+                    "You have crossed the event horizon of procrastination. Welcome.",
+                    "Scientists are watching. They've given up trying to help.",
+                    "The checkbox thanks you for the cardio.",
+                    "Level 99 task avoidance achieved. What a journey.",
+                ]
+            }
+        };
+
+        /* Extra catch-click reaction lines */
+        const catchReactions = {
+            exercise:  ["Nice try, legs.", "That counted as a rep, at least.", "Still not checked, but respect.", "Good form. Wrong checkbox."],
+            email:     ["Nice try, inbox zero.", "Still unread. Still unread.", "Reply not sent.", "The read receipt mocks you."],
+            work:      ["Deadline still exists.", "Meeting still on calendar.", "The client is still waiting.", "Nice try, project manager."],
+            study:     ["Page still unread.", "The exam still comes.", "Flashcard unflipped.", "The professor still expects you."],
+            clean:     ["Dust still there.", "The dishes snickered.", "Still 3 days of dishes.", "The mop remains unused."],
+            eat:       ["Still hungry.", "The fridge still empty.", "Kale still rotting.", "Order takeaway yet? No?"],
+            sleep:     ["Still tired.", "Still awake, still tired.", "8 hours lost.", "The pillow gives up too."],
+            money:     ["Bill still exists.", "Still in debt.", "The bank noticed.", "Budget: defeated again."],
+            social:    ["They're still waiting.", "Group chat still muted.", "Friend still on read.", "Mum still worried."],
+            creative:  ["Canvas still blank.", "Cursor still blinking.", "Git commit: zero.", "The muse is not impressed."],
+            health:    ["Appointment still missed.", "Still not booked.", "The dentist suspects.", "Still unchecked AND unchecked."],
+            travel:    ["Bag still unpacked.", "Flight still boarding without you.", "Passport still lost.", "Skyscanner refreshed again."],
+            pet:       ["Your dog judged that.", "The cat saw everything.", "The fish are unimpressed.", "Vet still waiting to hear from you."],
+            shopping:  ["Cart still full.", "Buy button still not pressed.", "The return window shortened.", "It's still in your basket."],
+            side_proj: ["Still pre-launch.", "Repo still empty.", "Pivot #4 incoming.", "No commits today either."],
+            generic:   ["Nice try.", "Ha. No.", "That won't work.", "Bold. But no.", "Almost. Not really.", "Try again? Or don't.", "Nope.", "Close— wait, no.", "I felt nothing."]
+        };
+
+        function pickFrom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function pickTaunt(cat, phase) {
+            const pool = tauntsMap[cat]?.[phase] ?? tauntsMap.generic[phase] ?? tauntsMap.generic[2];
+            return pickFrom(pool);
+        }
+
+        function pickCatchReaction(cat) {
+            const pool = catchReactions[cat] ?? catchReactions.generic;
+            return pickFrom(pool);
+        }
+
+        /* ============================================================
+           TOAST MESSAGES after phase escalation
+        ============================================================ */
+        const toastPhase2 = [
+            "This task seems… evasive.",
+            "The checkbox doesn't like your energy.",
+            "Getting a bit spicy in here.",
+            "I'd take the hint, personally.",
+            "The checkbox is warming up. So am I.",
+        ];
+        const toastPhase3 = [
+            "The checkbox has entered its final form.",
+            "This is not a to-do list anymore. This is art.",
+            "Level 3: chaos unlocked.",
+            "Even the checkbox would like rest. But you won't let it.",
+            "Final boss mode: activated.",
+        ];
+
+        /* ============================================================
+           DOM refs
+        ============================================================ */
+        const $input   = document.getElementById('taskInput');
+        const $addBtn  = document.getElementById('addBtn');
+        const $list    = document.getElementById('taskList');
+        const $empty   = document.getElementById('emptyState');
+        const $counter = document.getElementById('taskCounter');
+        const $toast   = document.getElementById('toast');
+        const $dateLine= document.getElementById('dateLine');
+
+        /* ============================================================
+           Date display
+        ============================================================ */
+        const now = new Date();
+        $dateLine.textContent = now.toLocaleDateString('en-US', {
+            weekday: 'long', month: 'long', day: 'numeric'
+        });
+
+        /* ============================================================
+           Helpers
+        ============================================================ */
+        function getPhase(ms) {
+            if (ms >= PHASE3_MS) return 3;
+            if (ms >= PHASE2_MS) return 2;
+            return 1;
+        }
+
+        function showToast(msg, dur = 3400) {
+            if (state.toastTimer) clearTimeout(state.toastTimer);
+            $toast.textContent = msg;
+            $toast.classList.add('visible');
+            state.toastTimer = setTimeout(() => $toast.classList.remove('visible'), dur);
+        }
+
+        function clamp(val, lo, hi) { return Math.max(lo, Math.min(hi, val)); }
+
+        /* ============================================================
+           Task CRUD
+        ============================================================ */
+        function addTask(text) {
+            text = (text || '').trim();
+            if (!text) return;
+
+            const id  = state.nextId++;
+            const cat = detectCategory(text);
+            const task = {
+                id,
+                text,
+                originalText: text,
+                category: cat,
+                chaseTime: 0,
+                phase: 1,
+                isChased: false,
+                isShaking: false,
+                tauntSet: false,
+                currentTaunt: null,
+                curX: 0, curY: 0,
+                tgtX: 0, tgtY: 0,
+            };
+            state.tasks.push(task);
+            renderTask(task);
+            refreshUI();
+            $input.value = '';
+            $input.focus();
+        }
+
+        function deleteTask(id) {
+            const el = $list.querySelector(`[data-tid="${id}"]`);
+            if (!el) return;
+            el.classList.add('deleting');
+            setTimeout(() => {
+                el.remove();
+                state.tasks = state.tasks.filter(t => t.id !== id);
+                refreshUI();
+            }, 500);
+        }
+
+        function renderTask(task) {
+            const div = document.createElement('div');
+            div.className = 'task-item';
+            div.setAttribute('data-tid', task.id);
+            div.setAttribute('role', 'listitem');
+
+            const hasCat = task.category !== 'generic';
+            const badgeHTML = hasCat
+                ? `<span class="ai-badge" id="aibadge-${task.id}">✦ ${task.category.replace('_',' ')}</span>`
+                : '';
+
+            div.innerHTML = `
+            <div class="checkbox-wrap">
+                <div class="checkbox"
+                     role="checkbox"
+                     aria-checked="false"
+                     aria-label="Complete: ${task.text}"
+                     tabindex="0"
+                     data-cid="${task.id}"></div>
+            </div>
+            <span class="task-text" data-txid="${task.id}">${task.text}${badgeHTML}</span>
+            <button class="delete-btn" aria-label="Delete task" data-did="${task.id}">
+                <i class="fas fa-xmark"></i>
+            </button>`;
+
+            if (hasCat) {
+                setTimeout(() => {
+                    const badge = div.querySelector(`#aibadge-${task.id}`);
+                    if (badge) badge.classList.add('visible');
+                }, 400);
+            }
+
+            div.querySelector('[data-did]').addEventListener('click', () => deleteTask(task.id));
+
+            const cb = div.querySelector('.checkbox');
+            const handleCatch = (e) => {
+                e.preventDefault();
+                if (task.isShaking) return;
+                fakeCheck(task, cb);
+            };
+            cb.addEventListener('click', handleCatch);
+            cb.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCatch(e); }
+            });
+
+            // Touch support: tap the checkbox
+            cb.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (!task.isShaking) fakeCheck(task, cb);
+                // Spawn danger cursor on touch
+                const rect = cb.getBoundingClientRect();
+                spawnMobileCursor(rect.left + rect.width/2, rect.top + rect.height/2, true);
+            }, { passive: false });
+
+            $list.appendChild(div);
+        }
+
+        /* ============================================================
+           Fake-check + contextual catch reaction
+        ============================================================ */
+        function fakeCheck(task, cb) {
+            task.isShaking = true;
+            cb.classList.remove('evading');
+            cb.style.transition = 'background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, transform 0s';
+            const cx = task.curX;
+            const cy = task.curY;
+            cb.style.setProperty('--cx', `${cx}px`);
+            cb.style.setProperty('--cy', `${cy}px`);
+            cb.style.transform = `translate(${cx}px, ${cy}px)`;
+            cb.classList.add('fake-checked');
+
+            const txEl = $list.querySelector(`[data-txid="${task.id}"]`);
+
+            setTimeout(() => {
+                cb.classList.remove('fake-checked');
+                cb.style.transition = '';
+                cb.classList.add('shaking');
+
+                if (txEl) {
+                    const reaction = pickCatchReaction(task.category);
+                    txEl.childNodes[0].textContent = reaction;
+                    txEl.classList.add('taunting');
+                }
+
+                setTimeout(() => {
+                    cb.classList.remove('shaking');
+                    cb.style.setProperty('--cx', '0px');
+                    cb.style.setProperty('--cy', '0px');
+                    task.isShaking = false;
+                    if (txEl) {
+                        txEl.childNodes[0].textContent = task.currentTaunt || task.originalText;
+                        if (!task.currentTaunt) txEl.classList.remove('taunting');
+                    }
+                }, 600);
+            }, 280);
+        }
+
+        function refreshUI() {
+            const n = state.tasks.length;
+            if (n === 0) {
+                $empty.style.display = '';
+                $counter.textContent = '0 tasks · 0 completed';
+                $counter.classList.remove('frustrated');
+                return;
+            }
+            $empty.style.display = 'none';
+            const word = n === 1 ? 'task' : 'tasks';
+            const maxChase = Math.max(...state.tasks.map(t => t.chaseTime), 0);
+
+            if (maxChase > PHASE2_MS) {
+                $counter.textContent = `${n} ${word} · 0 completed · growing concern`;
+                $counter.classList.add('frustrated');
+            } else {
+                $counter.textContent = `${n} ${word} · 0 completed`;
+                $counter.classList.remove('frustrated');
+            }
+        }
+
+        /* ============================================================
+           Phase change
+        ============================================================ */
+        function onPhaseChange(task, newPhase) {
+            const item = $list.querySelector(`[data-tid="${task.id}"]`);
+            const txEl = $list.querySelector(`[data-txid="${task.id}"]`);
+            if (!item || !txEl) return;
+
+            if (newPhase === 2 && !task.tauntSet) {
+                task.currentTaunt = pickTaunt(task.category, 2);
+                txEl.childNodes[0].textContent = task.currentTaunt;
+                txEl.classList.add('taunting');
+                task.tauntSet = true;
+                item.classList.add('phase-2');
+                showToast(pickFrom(toastPhase2));
+            } else if (newPhase === 3) {
+                task.currentTaunt = pickTaunt(task.category, 3);
+                txEl.childNodes[0].textContent = task.currentTaunt;
+                txEl.classList.add('taunting');
+                item.classList.remove('phase-2');
+                item.classList.add('phase-3');
+                showToast(pickFrom(toastPhase3));
+            }
+            refreshUI();
+        }
+
+        /* ============================================================
+           Teleport (Phase 3 edge escape)
+        ============================================================ */
+        function teleport(task, cb) {
+            const r  = cb.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top  + r.height / 2;
+
+            let fx, fy, tries = 0;
+            do {
+                fx = (Math.random() - 0.5) * 420;
+                fy = (Math.random() - 0.5) * 320;
+                const dist = Math.hypot(state.mouseX - (cx + fx), state.mouseY - (cy + fy));
+                tries++;
+                if (dist > 200 || tries > 50) break;
+            } while (true);
+
+            fx = clamp(fx, -cx + EDGE_PAD, window.innerWidth  - cx - EDGE_PAD);
+            fy = clamp(fy, -cy + EDGE_PAD, window.innerHeight - cy - EDGE_PAD);
+
+            task.tgtX = fx;
+            task.tgtY = fy;
+            task.curX = fx;
+            task.curY = fy;
+
+            cb.style.transition = 'none';
+            cb.style.transform  = `translate(${fx}px, ${fy}px)`;
+            cb.classList.add('evading');
+
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                cb.style.transition = '';
+            }));
+        }
+
+        /* ============================================================
+           Main rAF loop — physics-based smooth movement
+        ============================================================ */
+        function tick(ts) {
+            if (state.lastFrame === null) state.lastFrame = ts;
+            const dt = Math.min(ts - state.lastFrame, 50);
+            state.lastFrame = ts;
+
+            let anyEvading = false;
+
+            for (const task of state.tasks) {
+                const cb = $list.querySelector(`[data-cid="${task.id}"]`);
+                if (!cb || task.isShaking) continue;
+
+                const r     = cb.getBoundingClientRect();
+                const rawCx = r.left + r.width  / 2 - task.curX;
+                const rawCy = r.top  + r.height / 2 - task.curY;
+                const cx    = rawCx + task.curX;
+                const cy    = rawCy + task.curY;
+
+                const dx   = cx - state.mouseX;
+                const dy   = cy - state.mouseY;
+                const dist = Math.hypot(dx, dy);
+
+                const phase  = getPhase(task.chaseTime);
+                const radius = phase === 3 ? 100 : phase === 2 ? 80 : BASE_RADIUS;
+
+                if (dist < radius && dist > 0.5) {
+                    anyEvading = true;
+                    if (!task.isChased) task.isChased = true;
+                    task.chaseTime += dt;
+
+                    const newPhase = getPhase(task.chaseTime);
+                    if (newPhase > task.phase) {
+                        task.phase = newPhase;
+                        onPhaseChange(task, newPhase);
+                    }
+
+                    const mult = phase === 3 ? 1.55 : phase === 2 ? 1.25 : 1.05;
+                    const esc  = radius * mult;
+                    let ex = (esc / dist) * dx;
+                    let ey = (esc / dist) * dy;
+
+                    const nx = rawCx + ex;
+                    const ny = rawCy + ey;
+                    const offscreen = nx < EDGE_PAD || nx > window.innerWidth  - EDGE_PAD ||
+                                      ny < EDGE_PAD || ny > window.innerHeight - EDGE_PAD;
+
+                    if (phase === 3 && offscreen) {
+                        teleport(task, cb);
+                    } else {
+                        ex = clamp(ex, -rawCx + EDGE_PAD, window.innerWidth  - rawCx - EDGE_PAD);
+                        ey = clamp(ey, -rawCy + EDGE_PAD, window.innerHeight - rawCy - EDGE_PAD);
+                        task.tgtX = ex;
+                        task.tgtY = ey;
+                    }
+
+                    cb.classList.add('evading');
+                } else {
+                    if (task.isChased) task.isChased = false;
+                    task.tgtX = 0;
+                    task.tgtY = 0;
+                    cb.classList.remove('evading');
+                }
+
+                // Physics lerp — smooth movement, no jitter
+                const lerpSpeed = (task.tgtX === 0 && task.tgtY === 0) ? LERP_HOME : LERP_FAST;
+                const lt = 1 - Math.pow(1 - lerpSpeed, dt / 16);
+                task.curX += (task.tgtX - task.curX) * lt;
+                task.curY += (task.tgtY - task.curY) * lt;
+
+                cb.style.transition = 'border-color 0.2s ease, background 0.15s ease, box-shadow 0.2s ease';
+                cb.style.transform  = `translate(${task.curX.toFixed(2)}px, ${task.curY.toFixed(2)}px)`;
+            }
+
+            // Cursor danger state
+            if (anyEvading) {
+                $body.classList.add('cursor-danger');
+                $body.classList.remove('cursor-hover');
+            } else {
+                $body.classList.remove('cursor-danger');
+            }
+
+            requestAnimationFrame(tick);
+        }
+
+        /* ============================================================
+           Mouse / touch tracking
+        ============================================================ */
+        document.addEventListener('mousemove', e => {
+            state.mouseX = e.clientX;
+            state.mouseY = e.clientY;
+        });
+        document.addEventListener('touchmove', e => {
+            if (e.touches.length) {
+                state.mouseX = e.touches[0].clientX;
+                state.mouseY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+        document.addEventListener('touchstart', e => {
+            if (e.touches.length) {
+                state.mouseX = e.touches[0].clientX;
+                state.mouseY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+        document.addEventListener('touchend', () => {
+            // Reset mouse position after touch ends so checkboxes return home
+            setTimeout(() => {
+                state.mouseX = -9999;
+                state.mouseY = -9999;
+            }, 300);
+        }, { passive: true });
+        document.addEventListener('mouseleave', () => {
+            state.mouseX = -9999;
+            state.mouseY = -9999;
+        });
+
+        /* ============================================================
+           Resize — snap all home
+        ============================================================ */
+        window.addEventListener('resize', () => {
+            for (const task of state.tasks) {
+                task.tgtX = 0;
+                task.tgtY = 0;
+                const cb = $list.querySelector(`[data-cid="${task.id}"]`);
+                if (cb) {
+                    task.curX = 0; task.curY = 0;
+                    cb.style.transform = 'translate(0px, 0px)';
+                    cb.classList.remove('evading');
+                }
+            }
+        });
+
+        /* ============================================================
+           Input wiring
+        ============================================================ */
+        $addBtn.addEventListener('click', () => addTask($input.value));
+        $input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') addTask($input.value);
+        });
+
+        /* ============================================================
+           Seed tasks
+        ============================================================ */
+        const seeds = [
+            "Fold the laundry",
+            "Reply to Sarah's email",
+            "Finally start that side project",
+            "Go to the gym today",
+        ];
+        seeds.forEach((t, i) => setTimeout(() => addTask(t), 280 + i * 200));
+
+        requestAnimationFrame(tick);
+
+        /* ============================================================
+           Mobile cursor helper (available to touch events above)
+        ============================================================ */
+        function spawnMobileCursor(x, y, isDanger = false) {
+            $mobileCursor.style.left = x + 'px';
+            $mobileCursor.style.top  = y + 'px';
+            $mobileCursor.classList.toggle('danger', isDanger);
+
+            const outer = $mobileCursor.querySelector('.mc-outer');
+            outer.style.animation = 'none';
+            void outer.offsetHeight;
+            outer.style.animation = 'mcPulse 1.2s ease-out forwards';
+        }
+
+        // Expose spawnMobileCursor so touch listeners above can see it
+        // (it's defined before the IIFE ends, so closures are fine)
+
+    })();
+    </script>
+</body>
+
+</html>
