@@ -288,22 +288,42 @@
         .ai-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            font-size: 0.68rem;
+            gap: 4px;
+            font-size: 0.66rem;
             font-weight: 500;
             color: var(--accent);
             border: 1px solid var(--accent-light);
             background: var(--accent-light);
             border-radius: 100px;
-            padding: 2px 10px;
-            margin-left: 8px;
+            padding: 2px 9px;
+            margin-left: 6px;
             letter-spacing: 0.03em;
             opacity: 0;
             transform: scale(0.85);
             transition: opacity 0.35s, transform 0.35s;
             vertical-align: middle;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .ai-badge.visible { opacity: 1; transform: scale(1); }
+
+        /* ——— Task Text (flex to wrap badge on mobile) ——— */
+        .task-text {
+            flex: 1;
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: var(--fg);
+            line-height: 1.45;
+            transition: color 0.35s;
+            user-select: none;
+            min-width: 0;
+            /* Wrap so badge always stays visible on narrow screens */
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 2px;
+        }
+        .task-text.taunting { color: var(--danger); font-style: italic; font-weight: 300; }
 
         /* ——— Input Area ——— */
         .input-area {
@@ -595,7 +615,8 @@
 
         @media (max-width: 380px) {
             .header-left h1 { font-size: 1.75rem; }
-            .ai-badge { display: none; }
+            /* Keep the badge visible — it wraps to next line via flex-wrap */
+            .ai-badge { font-size: 0.62rem; padding: 1px 7px; }
         }
 
         /* Landscape mobile */
@@ -648,6 +669,54 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script>
+    /* ============================================================
+       🌈 APRIL FOOLS EASTER EGG — console only
+       Renders when DevTools is open; invisible otherwise.
+    ============================================================ */
+    (function aprilFoolsEgg() {
+        const RB = ['#FF0000','#FF4500','#FF8C00','#FFD700','#7FFF00',
+                    '#00E676','#00BCD4','#2196F3','#9C27B0','#E91E63'];
+        const title  = '✦  A p r i l   F o o l s  ✦';
+        const author = '  Made By  PIYUSHDAS1624  ';
+
+        // Build per-character rainbow format strings
+        let fmt = '', styles = [];
+        [...title].forEach((ch, i) => {
+            fmt += '%c' + ch;
+            styles.push(
+                'color:' + RB[i % RB.length] + ';' +
+                'font-size:22px;font-weight:900;' +
+                'text-shadow:0 0 8px ' + RB[i % RB.length] + ';'
+            );
+        });
+
+        // Author line styles
+        let afmt = '', astyles = [];
+        [...author].forEach((ch, i) => {
+            afmt += '%c' + ch;
+            astyles.push(
+                'color:' + RB[(i + 3) % RB.length] + ';' +
+                'font-size:13px;font-weight:700;letter-spacing:2px;'
+            );
+        });
+
+        // Separator
+        const sep = '%c' + '─'.repeat(38);
+        const sepStyle = 'color:#555;font-size:10px;';
+
+        setTimeout(() => {
+            console.log('\n');
+            console.log(sep, sepStyle);
+            console.log(fmt, ...styles);
+            console.log('\n');
+            console.log(afmt, ...astyles);
+            console.log(sep, sepStyle);
+            console.log('%c🎉 Happy April Fools\'s Day! 🎉',
+                'color:#FF69B4;font-size:11px;font-style:italic;');
+            console.log('\n');
+        }, 500);
+    })();
+
     (() => {
         /* ============================================================
            DARK MODE
@@ -1574,14 +1643,24 @@
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCatch(e); }
             });
 
-            // Touch support: tap the checkbox
-            cb.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                if (!task.isShaking) fakeCheck(task, cb);
-                // Spawn danger cursor on touch
-                const rect = cb.getBoundingClientRect();
-                spawnMobileCursor(rect.left + rect.width/2, rect.top + rect.height/2, true);
-            }, { passive: false });
+            // Touch support: on touchstart, INSTANTLY push the checkbox away
+            // so users immediately see it flee before the click fires (~300ms later).
+            // We do NOT call fakeCheck here — the natural click event handles that.
+            cb.addEventListener('touchstart', (e) => {
+                if (e.touches.length) {
+                    const t = e.touches[0];
+                    // Immediately snap mouse position to touch so tick evades right away
+                    state.mouseX = t.clientX;
+                    state.mouseY = t.clientY;
+                    // Spawn mobile ripple cursor
+                    spawnMobileCursor(t.clientX, t.clientY, true);
+                }
+            }, { passive: true });
+
+            // NOTE: do NOT add a touchend handler here.
+            // The browser fires a synthetic 'click' ~300ms after touchend;
+            // the click handler (below) calls fakeCheck — by then the checkbox
+            // will have already fled visually via the tick loop.
 
             $list.appendChild(div);
         }
@@ -1813,11 +1892,13 @@
             }
         }, { passive: true });
         document.addEventListener('touchend', () => {
-            // Reset mouse position after touch ends so checkboxes return home
+            // Reset after 800ms — gives the checkbox enough time to flee visually
+            // before returning home. (The synthetic click fires at ~300ms, so by
+            // 800ms fakeCheck has already played and isShaking is false.)
             setTimeout(() => {
                 state.mouseX = -9999;
                 state.mouseY = -9999;
-            }, 300);
+            }, 800);
         }, { passive: true });
         document.addEventListener('mouseleave', () => {
             state.mouseX = -9999;
